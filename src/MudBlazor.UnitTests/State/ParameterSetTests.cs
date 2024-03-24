@@ -10,6 +10,8 @@ using System.Threading.Tasks;
 using FluentAssertions;
 using Microsoft.AspNetCore.Components;
 using MudBlazor.State;
+using MudBlazor.State.Builder;
+using MudBlazor.UnitTests.State.Mocks;
 using NUnit.Framework;
 
 namespace MudBlazor.UnitTests.State;
@@ -24,7 +26,11 @@ public class ParameterSetTests
         // Arrange
         const int Parameter = 1;
         var parameterSet = new ParameterSet();
-        var parameterState = ParameterState.Attach(nameof(Parameter), () => Parameter, () => (EventCallback<int>)default);
+        var parameterState = ParameterAttachBuilder
+            .Create<int>()
+            .WithMetadata(new ParameterMetadata(nameof(Parameter)))
+            .WithGetParameterValueFunc(() => Parameter)
+            .Attach();
 
         // Act
         parameterSet.Add(parameterState);
@@ -38,7 +44,11 @@ public class ParameterSetTests
     {
         // Arrange
         const int Parameter = 1;
-        var parameterState = ParameterState.Attach(nameof(Parameter), () => Parameter, () => (EventCallback<int>)default);
+        var parameterState = ParameterAttachBuilder
+            .Create<int>()
+            .WithMetadata(new ParameterMetadata(nameof(Parameter)))
+            .WithGetParameterValueFunc(() => Parameter)
+            .Attach();
         var parameterSet = new ParameterSet { parameterState };
 
         // Act 
@@ -49,8 +59,223 @@ public class ParameterSetTests
     }
 
     [Test]
+    public async Task SetParametersAsync_ActionHandlerShouldFire()
+    {
+        // Arrange
+        ParameterChangedEventArgs<int>? parameter2ChangedEventArgs = null;
+        var handler1FireCount = 0;
+        var handler2FireCount = 0;
+        const int Parameter1 = 1;
+        const int Parameter2 = 2;
+        const int Parameter1NewValue = 2;
+        const int Parameter2NewValue = 3;
+        const string Parameter1Name = nameof(Parameter1);
+        const string Parameter2Name = nameof(Parameter2);
+        var parametersDictionary = new Dictionary<string, object?>
+        {
+            { Parameter1Name, Parameter1NewValue },
+            { Parameter2Name, Parameter2NewValue }
+        };
+        var parameterView = ParameterView.FromDictionary(parametersDictionary);
+        var parameter1State = ParameterAttachBuilder
+            .Create<int>()
+            .WithMetadata(new ParameterMetadata(Parameter1Name))
+            .WithGetParameterValueFunc(() => Parameter1)
+            .WithParameterChangedHandler(OnParameter1Change)
+            .Attach();
+        var parameter2State = ParameterAttachBuilder
+            .Create<int>()
+            .WithMetadata(new ParameterMetadata(Parameter2Name))
+            .WithGetParameterValueFunc(() => Parameter2)
+            .WithParameterChangedHandler(OnParameter2Change)
+            .Attach();
+        var parameterSet = new ParameterSet { parameter1State, parameter2State };
+        void OnParameter1Change()
+        {
+            handler1FireCount++;
+        }
+        void OnParameter2Change(ParameterChangedEventArgs<int> parameterChangedEventArgs)
+        {
+            parameter2ChangedEventArgs = parameterChangedEventArgs;
+            handler2FireCount++;
+        }
+
+        // Act
+        await parameterSet.SetParametersAsync(_ => Task.CompletedTask, parameterView);
+
+        // Assert
+        handler1FireCount.Should().Be(1);
+        handler2FireCount.Should().Be(1);
+        parameter2ChangedEventArgs.Should().NotBeNull();
+        parameter2ChangedEventArgs!.ParameterName.Should().Be(Parameter2Name);
+        parameter2ChangedEventArgs!.LastValue.Should().Be(Parameter2);
+        parameter2ChangedEventArgs!.Value.Should().Be(Parameter2NewValue);
+    }
+
+    [Test]
+    public async Task SetParametersAsync_ActionHandlerShouldNotFire()
+    {
+        // Arrange
+        ParameterChangedEventArgs<int>? parameter2ChangedEventArgs = null;
+        var handler1FireCount = 0;
+        var handler2FireCount = 0;
+        const int Parameter1 = 1;
+        const int Parameter2 = 2;
+        const string Parameter1Name = nameof(Parameter1);
+        const string Parameter2Name = nameof(Parameter2);
+        var parametersDictionary = new Dictionary<string, object?>
+        {
+            { Parameter1Name, Parameter1 },
+            { Parameter2Name, Parameter2 }
+        };
+        var parameterView = ParameterView.FromDictionary(parametersDictionary);
+        var parameter1State = ParameterAttachBuilder
+            .Create<int>()
+            .WithMetadata(new ParameterMetadata(Parameter1Name))
+            .WithGetParameterValueFunc(() => Parameter1)
+            .WithParameterChangedHandler(OnParameter1Change)
+            .Attach();
+        var parameter2State = ParameterAttachBuilder
+            .Create<int>()
+            .WithMetadata(new ParameterMetadata(Parameter2Name))
+            .WithGetParameterValueFunc(() => Parameter2)
+            .WithParameterChangedHandler(OnParameter2Change)
+            .Attach();
+        var parameterSet = new ParameterSet { parameter1State, parameter2State };
+        void OnParameter1Change()
+        {
+            handler1FireCount++;
+        }
+        void OnParameter2Change(ParameterChangedEventArgs<int> parameterChangedEventArgs)
+        {
+            parameter2ChangedEventArgs = parameterChangedEventArgs;
+            handler2FireCount++;
+        }
+
+        // Act
+        await parameterSet.SetParametersAsync(_ => Task.CompletedTask, parameterView);
+
+        // Assert
+        handler1FireCount.Should().Be(0);
+        handler2FireCount.Should().Be(0);
+        parameter2ChangedEventArgs.Should().BeNull();
+    }
+
+    [Test]
+    public async Task SetParametersAsync_FuncHandlerShouldFire()
+    {
+        // Arrange
+        ParameterChangedEventArgs<int>? parameter2ChangedEventArgs = null;
+        var handler1FireCount = 0;
+        var handler2FireCount = 0;
+        const int Parameter1 = 1;
+        const int Parameter2 = 2;
+        const int Parameter1NewValue = 2;
+        const int Parameter2NewValue = 3;
+        const string Parameter1Name = nameof(Parameter1);
+        const string Parameter2Name = nameof(Parameter2);
+        var parametersDictionary = new Dictionary<string, object?>
+        {
+            { Parameter1Name, Parameter1NewValue },
+            { Parameter2Name, Parameter2NewValue }
+        };
+        var parameterView = ParameterView.FromDictionary(parametersDictionary);
+        var parameter1State = ParameterAttachBuilder
+            .Create<int>()
+            .WithMetadata(new ParameterMetadata(Parameter1Name))
+            .WithGetParameterValueFunc(() => Parameter1)
+            .WithParameterChangedHandler(OnParameter1ChangeAsync)
+            .Attach();
+        var parameter2State = ParameterAttachBuilder
+            .Create<int>()
+            .WithMetadata(new ParameterMetadata(Parameter2Name))
+            .WithGetParameterValueFunc(() => Parameter2)
+            .WithParameterChangedHandler(OnParameter2ChangeAsync)
+            .Attach();
+        var parameterSet = new ParameterSet { parameter1State, parameter2State };
+        Task OnParameter1ChangeAsync()
+        {
+            handler1FireCount++;
+
+            return Task.CompletedTask;
+        }
+        Task OnParameter2ChangeAsync(ParameterChangedEventArgs<int> parameterChangedEventArgs)
+        {
+            parameter2ChangedEventArgs = parameterChangedEventArgs;
+            handler2FireCount++;
+
+            return Task.CompletedTask;
+        }
+
+        // Act
+        await parameterSet.SetParametersAsync(_ => Task.CompletedTask, parameterView);
+
+        // Assert
+        handler1FireCount.Should().Be(1);
+        handler2FireCount.Should().Be(1);
+        parameter2ChangedEventArgs.Should().NotBeNull();
+        parameter2ChangedEventArgs!.ParameterName.Should().Be(Parameter2Name);
+        parameter2ChangedEventArgs!.LastValue.Should().Be(Parameter2);
+        parameter2ChangedEventArgs!.Value.Should().Be(Parameter2NewValue);
+    }
+
+    [Test]
+    public async Task SetParametersAsync_FuncHandlerShouldNotFire()
+    {
+        // Arrange
+        ParameterChangedEventArgs<int>? parameter2ChangedEventArgs = null;
+        var handler1FireCount = 0;
+        var handler2FireCount = 0;
+        const int Parameter1 = 1;
+        const int Parameter2 = 2;
+        const string Parameter1Name = nameof(Parameter1);
+        const string Parameter2Name = nameof(Parameter2);
+        var parametersDictionary = new Dictionary<string, object?>
+        {
+            { Parameter1Name, Parameter1 },
+            { Parameter2Name, Parameter2 }
+        };
+        var parameterView = ParameterView.FromDictionary(parametersDictionary);
+        var parameter1State = ParameterAttachBuilder
+            .Create<int>()
+            .WithMetadata(new ParameterMetadata(Parameter1Name))
+            .WithGetParameterValueFunc(() => Parameter1)
+            .WithParameterChangedHandler(OnParameter1ChangeAsync)
+            .Attach();
+        var parameter2State = ParameterAttachBuilder
+            .Create<int>()
+            .WithMetadata(new ParameterMetadata(Parameter2Name))
+            .WithGetParameterValueFunc(() => Parameter2)
+            .WithParameterChangedHandler(OnParameter2ChangeAsync)
+            .Attach();
+        var parameterSet = new ParameterSet { parameter1State, parameter2State };
+        Task OnParameter1ChangeAsync()
+        {
+            handler1FireCount++;
+
+            return Task.CompletedTask;
+        }
+        Task OnParameter2ChangeAsync(ParameterChangedEventArgs<int> parameterChangedEventArgs)
+        {
+            parameter2ChangedEventArgs = parameterChangedEventArgs;
+            handler2FireCount++;
+
+            return Task.CompletedTask;
+        }
+
+        // Act
+        await parameterSet.SetParametersAsync(_ => Task.CompletedTask, parameterView);
+
+        // Assert
+        handler1FireCount.Should().Be(0);
+        handler2FireCount.Should().Be(0);
+        parameter2ChangedEventArgs.Should().BeNull();
+    }
+
+    [Test]
     public async Task SetParametersAsync_SameHandlerNamesShouldFireOnce()
     {
+        // Arrange
         var handlerFireCount = 0;
         const int Parameter1 = 1;
         const int Parameter2 = 2;
@@ -65,9 +290,24 @@ public class ParameterSetTests
             { ParameterName3, 4 }
         };
         var parameterView = ParameterView.FromDictionary(parametersDictionary);
-        var parameterState1 = ParameterState.Attach(new ParameterMetadata(ParameterName1, nameof(OnParameterChange)), () => Parameter1, OnParameterChange);
-        var parameterState2 = ParameterState.Attach(new ParameterMetadata(ParameterName2, nameof(OnParameterChange)), () => Parameter2, OnParameterChange);
-        var parameterState3 = ParameterState.Attach(new ParameterMetadata(ParameterName3, nameof(OnParameterChange)), () => Parameter3, OnParameterChange);
+        var parameterState1 = ParameterAttachBuilder
+            .Create<int>()
+            .WithMetadata(new ParameterMetadata(ParameterName1, nameof(OnParameterChange)))
+            .WithGetParameterValueFunc(() => Parameter1)
+            .WithParameterChangedHandler(OnParameterChange)
+            .Attach();
+        var parameterState2 = ParameterAttachBuilder
+            .Create<int>()
+            .WithMetadata(new ParameterMetadata(ParameterName2, nameof(OnParameterChange)))
+            .WithGetParameterValueFunc(() => Parameter2)
+            .WithParameterChangedHandler(OnParameterChange)
+            .Attach();
+        var parameterState3 = ParameterAttachBuilder
+            .Create<int>()
+            .WithMetadata(new ParameterMetadata(ParameterName3, nameof(OnParameterChange)))
+            .WithGetParameterValueFunc(() => Parameter3)
+            .WithParameterChangedHandler(OnParameterChange)
+            .Attach();
         var parameterSet = new ParameterSet { parameterState1, parameterState2, parameterState3 };
         void OnParameterChange()
         {
@@ -84,6 +324,7 @@ public class ParameterSetTests
     [Test]
     public async Task SetParametersAsync_LambdaHandlerNamesShouldFileAll()
     {
+        // Arrange
         var handlerFireCount = 0;
         const int Parameter1 = 1;
         const int Parameter2 = 2;
@@ -99,9 +340,24 @@ public class ParameterSetTests
             { ParameterName3, 4 }
         };
         var parameterView = ParameterView.FromDictionary(parametersDictionary);
-        var parameterState1 = ParameterState.Attach(new ParameterMetadata(ParameterName1, HandlerNameExpression), () => Parameter1, () => handlerFireCount++);
-        var parameterState2 = ParameterState.Attach(new ParameterMetadata(ParameterName2, HandlerNameExpression), () => Parameter2, () => handlerFireCount++);
-        var parameterState3 = ParameterState.Attach(new ParameterMetadata(ParameterName3, HandlerNameExpression), () => Parameter3, () => handlerFireCount++);
+        var parameterState1 = ParameterAttachBuilder
+            .Create<int>()
+            .WithMetadata(new ParameterMetadata(ParameterName1, HandlerNameExpression))
+            .WithGetParameterValueFunc(() => Parameter1)
+            .WithParameterChangedHandler(() => handlerFireCount++)
+            .Attach();
+        var parameterState2 = ParameterAttachBuilder
+            .Create<int>()
+            .WithMetadata(new ParameterMetadata(ParameterName2, HandlerNameExpression))
+            .WithGetParameterValueFunc(() => Parameter2)
+            .WithParameterChangedHandler(() => handlerFireCount++)
+            .Attach();
+        var parameterState3 = ParameterAttachBuilder
+            .Create<int>()
+            .WithMetadata(new ParameterMetadata(ParameterName3, HandlerNameExpression))
+            .WithGetParameterValueFunc(() => Parameter3)
+            .WithParameterChangedHandler(() => handlerFireCount++)
+            .Attach();
         var parameterSet = new ParameterSet { parameterState1, parameterState2, parameterState3 };
 
         // Act
@@ -114,6 +370,7 @@ public class ParameterSetTests
     [Test]
     public async Task SetParametersAsync_NullHandlerNamesShouldFireAll()
     {
+        // Arrange
         var handlerFireCount = 0;
         const int Parameter1 = 1;
         const int Parameter2 = 2;
@@ -128,9 +385,24 @@ public class ParameterSetTests
             { ParameterName3, 4 }
         };
         var parameterView = ParameterView.FromDictionary(parametersDictionary);
-        var parameterState1 = ParameterState.Attach(new ParameterMetadata(ParameterName1, null), () => Parameter1, OnParameterChange);
-        var parameterState2 = ParameterState.Attach(new ParameterMetadata(ParameterName2, null), () => Parameter2, OnParameterChange);
-        var parameterState3 = ParameterState.Attach(new ParameterMetadata(ParameterName3, null), () => Parameter3, OnParameterChange);
+        var parameterState1 = ParameterAttachBuilder
+            .Create<int>()
+            .WithMetadata(new ParameterMetadata(ParameterName1, null))
+            .WithGetParameterValueFunc(() => Parameter1)
+            .WithParameterChangedHandler(OnParameterChange)
+            .Attach();
+        var parameterState2 = ParameterAttachBuilder
+            .Create<int>()
+            .WithMetadata(new ParameterMetadata(ParameterName2, null))
+            .WithGetParameterValueFunc(() => Parameter2)
+            .WithParameterChangedHandler(OnParameterChange)
+            .Attach();
+        var parameterState3 = ParameterAttachBuilder
+            .Create<int>()
+            .WithMetadata(new ParameterMetadata(ParameterName3, null))
+            .WithGetParameterValueFunc(() => Parameter3)
+            .WithParameterChangedHandler(OnParameterChange)
+            .Attach();
         var parameterSet = new ParameterSet { parameterState1, parameterState2, parameterState3 };
         void OnParameterChange()
         {
@@ -147,6 +419,7 @@ public class ParameterSetTests
     [Test]
     public async Task SetParametersAsync_DifferentHandlerNamesShouldFireAll()
     {
+        // Arrange
         var handlerFireCount = 0;
         const int Parameter1 = 1;
         const int Parameter2 = 2;
@@ -161,9 +434,24 @@ public class ParameterSetTests
             { ParameterName3, 4 }
         };
         var parameterView = ParameterView.FromDictionary(parametersDictionary);
-        var parameterState1 = ParameterState.Attach(new ParameterMetadata(ParameterName1, nameof(OnParameterChange1)), () => Parameter1, OnParameterChange1);
-        var parameterState2 = ParameterState.Attach(new ParameterMetadata(ParameterName2, nameof(OnParameterChange2)), () => Parameter2, OnParameterChange2);
-        var parameterState3 = ParameterState.Attach(new ParameterMetadata(ParameterName3, nameof(OnParameterChange3)), () => Parameter3, OnParameterChange3);
+        var parameterState1 = ParameterAttachBuilder
+            .Create<int>()
+            .WithMetadata(new ParameterMetadata(ParameterName1, nameof(OnParameterChange1)))
+            .WithGetParameterValueFunc(() => Parameter1)
+            .WithParameterChangedHandler(OnParameterChange1)
+            .Attach();
+        var parameterState2 = ParameterAttachBuilder
+            .Create<int>()
+            .WithMetadata(new ParameterMetadata(ParameterName2, nameof(OnParameterChange2)))
+            .WithGetParameterValueFunc(() => Parameter2)
+            .WithParameterChangedHandler(OnParameterChange2)
+            .Attach();
+        var parameterState3 = ParameterAttachBuilder
+            .Create<int>()
+            .WithMetadata(new ParameterMetadata(ParameterName3, nameof(OnParameterChange3)))
+            .WithGetParameterValueFunc(() => Parameter3)
+            .WithParameterChangedHandler(OnParameterChange3)
+            .Attach();
         var parameterSet = new ParameterSet { parameterState1, parameterState2, parameterState3 };
         void OnParameterChange1()
         {
@@ -186,6 +474,69 @@ public class ParameterSetTests
     }
 
     [Test]
+    public async Task SetParametersAsync_CustomComparer_HandlerShouldFire()
+    {
+        // Arrange
+        var comparer = new DoubleEpsilonEqualityComparer(0.00001f);
+        var parameterChangedHandlerMock = new ParameterChangedHandlerMock<double>();
+        const double Parameter = 10000f;
+        const double ParameterNewValue = 10001f;
+        const string ParameterName = nameof(Parameter);
+        var parametersDictionary = new Dictionary<string, object?>
+        {
+            { ParameterName, ParameterNewValue },
+        };
+        var parameterView = ParameterView.FromDictionary(parametersDictionary);
+        var parameterState = ParameterAttachBuilder
+            .Create<double>()
+            .WithMetadata(new ParameterMetadata(nameof(Parameter)))
+            .WithGetParameterValueFunc(() => Parameter)
+            .WithParameterChangedHandler(parameterChangedHandlerMock)
+            .WithComparer(comparer)
+            .Attach();
+        var parameterSet = new ParameterSet { parameterState };
+
+        // Act
+        await parameterSet.SetParametersAsync(_ => Task.CompletedTask, parameterView);
+
+        // Assert
+        parameterChangedHandlerMock.Changes.Should().BeEquivalentTo(new[]
+        {
+            new ParameterChangedEventArgs<double>(ParameterName, Parameter, ParameterNewValue)
+        });
+    }
+
+    [Test]
+    public async Task SetParametersAsync_CustomComparer_HandlerShouldNotFire()
+    {
+        // Arrange
+        var comparer = new DoubleEpsilonEqualityComparer(0.00001f);
+        var parameterChangedHandlerMock = new ParameterChangedHandlerMock<double>();
+        const double Parameter = 1000000f;
+        const double ParameterNewValue = 1000001f;
+        const string ParameterName = nameof(Parameter);
+        var parametersDictionary = new Dictionary<string, object?>
+        {
+            { ParameterName, ParameterNewValue }
+        };
+        var parameterView = ParameterView.FromDictionary(parametersDictionary);
+        var parameterState = ParameterAttachBuilder
+            .Create<double>()
+            .WithMetadata(new ParameterMetadata(nameof(Parameter)))
+            .WithGetParameterValueFunc(() => Parameter)
+            .WithParameterChangedHandler(parameterChangedHandlerMock)
+            .WithComparer(comparer)
+            .Attach();
+        var parameterSet = new ParameterSet { parameterState };
+
+        // Act
+        await parameterSet.SetParametersAsync(_ => Task.CompletedTask, parameterView);
+
+        // Assert
+        parameterChangedHandlerMock.Changes.Should().BeEmpty("Within the epsilon tolerance.");
+    }
+
+    [Test]
     public void GetEnumeratorNonGeneric_ReturnsAllParameters()
     {
         // Arrange
@@ -193,9 +544,21 @@ public class ParameterSetTests
         const int Parameter2 = 2;
         const int Parameter3 = 3;
         var parameters = new ParameterSet();
-        var parameterState1 = ParameterState.Attach(nameof(Parameter1), () => Parameter1, () => (EventCallback<int>)default);
-        var parameterState2 = ParameterState.Attach(nameof(Parameter2), () => Parameter2, () => (EventCallback<int>)default);
-        var parameterState3 = ParameterState.Attach(nameof(Parameter3), () => Parameter3, () => (EventCallback<int>)default);
+        var parameterState1 = ParameterAttachBuilder
+            .Create<int>()
+            .WithMetadata(new ParameterMetadata(nameof(Parameter1)))
+            .WithGetParameterValueFunc(() => Parameter1)
+            .Attach();
+        var parameterState2 = ParameterAttachBuilder
+            .Create<int>()
+            .WithMetadata(new ParameterMetadata(nameof(Parameter2)))
+            .WithGetParameterValueFunc(() => Parameter2)
+            .Attach();
+        var parameterState3 = ParameterAttachBuilder
+            .Create<int>()
+            .WithMetadata(new ParameterMetadata(nameof(Parameter3)))
+            .WithGetParameterValueFunc(() => Parameter3)
+            .Attach();
         var expectedParameters = new List<IParameterComponentLifeCycle> { parameterState1, parameterState2, parameterState3 };
 
         foreach (var expectedParameter in expectedParameters)
@@ -226,9 +589,21 @@ public class ParameterSetTests
         const int Parameter2 = 2;
         const int Parameter3 = 3;
         var parameters = new ParameterSet();
-        var parameterState1 = ParameterState.Attach(nameof(Parameter1), () => Parameter1, () => (EventCallback<int>)default);
-        var parameterState2 = ParameterState.Attach(nameof(Parameter2), () => Parameter2, () => (EventCallback<int>)default);
-        var parameterState3 = ParameterState.Attach(nameof(Parameter3), () => Parameter3, () => (EventCallback<int>)default);
+        var parameterState1 = ParameterAttachBuilder
+            .Create<int>()
+            .WithMetadata(new ParameterMetadata(nameof(Parameter1)))
+            .WithGetParameterValueFunc(() => Parameter1)
+            .Attach();
+        var parameterState2 = ParameterAttachBuilder
+            .Create<int>()
+            .WithMetadata(new ParameterMetadata(nameof(Parameter2)))
+            .WithGetParameterValueFunc(() => Parameter2)
+            .Attach();
+        var parameterState3 = ParameterAttachBuilder
+            .Create<int>()
+            .WithMetadata(new ParameterMetadata(nameof(Parameter3)))
+            .WithGetParameterValueFunc(() => Parameter3)
+            .Attach();
         var expectedParameters = new List<IParameterComponentLifeCycle> { parameterState1, parameterState2, parameterState3 };
 
         foreach (var expectedParameter in expectedParameters)
