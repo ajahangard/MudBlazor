@@ -23,7 +23,7 @@ namespace MudBlazor
         [Parameter] public RenderFragment ChildContent { get; set; }
 
         private SortDirection _initialDirection;
-        private bool _isSelected;
+        private bool _selected;
 
         [Parameter]
         public SortDirection SortDirection
@@ -175,7 +175,7 @@ namespace MudBlazor
                 if (DataGrid == null)
                     return false;
 
-                return DataGrid.FilterDefinitions.Any(x => x.Column?.PropertyName == Column?.PropertyName && x.Operator != null && x.Value != null);
+                return DataGrid.FilterDefinitions.Any(x => x.Column?.PropertyName == Column?.PropertyName && x.Operator != null);
             }
         }
 
@@ -224,7 +224,7 @@ namespace MudBlazor
         /// <param name="removedSorts">The removed sorts.</param>
         private void OnGridSortChanged(Dictionary<string, SortDefinition<T>> activeSorts, HashSet<string> removedSorts)
         {
-            if ((Column.Sortable.HasValue && !Column.Sortable.Value) || string.IsNullOrWhiteSpace(Column.PropertyName))
+            if (Column == null || (Column.Sortable.HasValue && !Column.Sortable.Value) || string.IsNullOrWhiteSpace(Column.PropertyName))
                 return;
 
             if (null != removedSorts && removedSorts.Contains(Column.PropertyName))
@@ -239,13 +239,13 @@ namespace MudBlazor
 
         private void OnSelectedAllItemsChanged(bool value)
         {
-            _isSelected = value;
+            _selected = value;
             StateHasChanged();
         }
 
         private void OnSelectedItemsChanged(HashSet<T> items)
         {
-            _isSelected = items.Count == DataGrid.GetFilteredItemsCount();
+            _selected = items.Count == DataGrid.GetFilteredItemsCount();
             StateHasChanged();
         }
 
